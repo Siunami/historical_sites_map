@@ -1,0 +1,373 @@
+<!--
+TODO:
+- Add slider to select time. Modifies city dataset before creating heatmap
+- Use imgUrl as a background to each information card
+- Clean simple cards semi opaque black/white on top of image
+ 	white/black text
+-->
+
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+#container1 { border:1px dotted blue; width: 100%; height: 475px; position: relative; }
+#slider-toggle {
+	height: 50px;
+}
+#slider-toggle.off .noUi-handle {
+	border-color: red;
+}
+</style>
+	<script src="./map_files/d3.v3.min.js"></script>
+	<script src="./map_files/topojson.v1.min.js"></script>
+	<link href="./map_files/bootstrap.min.css" rel="stylesheet">
+	<link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet">
+	<link href="./map_files/base.css" rel="stylesheet" type="text/css">
+	<!-- <link href="./map_files/prism.css" rel="stylesheet" type="text/css"> -->
+	<script src="./map_files/wNumb.js"></script>
+
+	<link href="./map_files/nouislider.css" rel="stylesheet" type="text/css">
+	<link href="./map_files/nouislider.pips.css" rel="stylesheet" type="text/css">
+	<link href="./map_files/nouislider.tooltips.css" rel="stylesheet" type="text/css">
+
+	 <script src="./map_files/jquery-2.1.1.min.js"></script>
+			<script src="./map_files/jquery.h5validate.js"></script>
+			<script src="./map_files/bootstrap.js"></script>
+
+	<script src="./map_files/nouislider.min.js"></script>
+
+	<script src="./map_files/nouislider.js"></script>
+	<!-- I recommend you host this file on your own, since this will change without warning -->
+	<script src="./map_files/datamaps.world.min.js"></script>
+</head>
+<meta charset="utf-8">
+<body cz-shortcut-listen="true" id="container">
+  <h2>Datamaps Playground</h2>
+
+
+	<div id = "container1"></div>
+	<hr id = "infoStart">
+	<!-- <div id="toggleContainer" class="col-md-12">
+		<div id="slider-toggle"></div>
+		<div id="slider-status"></div>
+	</div> -->
+	<div id = "display">
+
+	</div>
+
+		<!-- <div id="rangeFilter" class="row" style="padding: 20px 20px 10px; width: 923px;">
+			<div id="nonlinear" class="noUi-target noUi-ltr noUi-horizontal noUi-background">
+				<div class="noUi-base"><div class="noUi-origin noUi-connect" style="left: 0%;">
+					<div class="noUi-handle noUi-handle-lower" title="4000 BC and before">
+					</div>
+				</div>
+				<div class="noUi-origin noUi-background" style="left: 100%;">
+					<div class="noUi-handle noUi-handle-upper" title="Today">
+					</div>
+				</div>
+			</div>
+			<div class="noUi-pips noUi-pips-horizontal">
+			</div>
+		</div>
+	    <span style="float:left;color:#aaa;margin-left:-15px;margin-top:5px;">4000 BC and before</span><span style="float:right;color:#aaa;margin-right:-15px;margin-top:5px;">Today</span>
+	    <div id="status">
+
+	      <b class="pull-left text-right" id="lower-offset">From:</b>
+	      <span class="pull-left text-left" id="lower-value">4000 BC and before</span>
+	      <b class="pull-left text-right" id="upper-offset">To:</b>
+	      <span class="pull-left text-left" id="upper-value">Today</span>
+	    </div>
+		</div> -->
+		<script>
+			// var min = 0, max = 0, minVal = 0, maxVal = 0, minValText = 0, maxValText = 0;
+			// var toggleSlider = document.getElementById('slider-toggle');
+			// var toggleStatus = document.getElementById('slider-status');
+			// noUiSlider.create(toggleSlider, {
+			// 	orientation: "vertical",
+			// 	start: 0,
+			// 	range: {
+			// 		'min': [0, 1],
+			// 		'max': 1
+			// 	},
+			// 	format: wNumb({
+			// 		decimals: 0
+			// 	})
+			// })
+			//
+			// toggleSlider.noUiSlider.on('update', function( values, handle ){
+			// 	if ( values[handle] === '1' ) {
+			// 		toggleSlider.classList.add('off');
+			// 		toggleStatus.innerHTML = "Oldest";
+			// 	} else {
+			// 		toggleSlider.classList.remove('off');
+			// 		toggleStatus.innerHTML = "oldest";
+			// 	}
+			// });
+			//add in resize bahviour
+			var resize = d3.select(window).on("resize", redraw);
+			var cities=[];
+
+			startFetchingData(1);
+			function startFetchingData(page){
+				var limit = 100;
+				if(page == 1) {
+					cities = [];
+				}
+				try
+				{
+			//		var url = 'http://192.168.4.12:8080/ds/api/getPOIs?loggedInUserId=5788d0d9a387106f36cefb06&breadcrumb=false&datasetId=579f213fa3871f463b8e81c2&limit='+limit+'&page='+page;
+				//	var url = 'https://devtools.crucialbits.com/ds/api/getPOIs?loggedInUserId=5767f457e4b0bacd26f946d0&breadcrumb=false&datasetId=57937e22e4b0cf4bd92bf172&limit='+limit+'&page='+page;
+					var url = 'https://ds.crucialbits.com/ds/api/getPOIs?loggedInUserId=5763860a68b56b068fc7cd6b&breadcrumb=false&datasetId=579b4a98e4b0a785b13fc361&limit='+limit+'&page='+page;
+
+					$.ajax({
+					url: url,
+					type: "GET",
+					cache: false,
+					success: function (response) {
+						console.log(response);
+					if(response.status) {
+
+						console.log('count ', response.data.poiList.length);
+						if(response.data.poiList.length == limit) {
+							startFetchingData(page+1);
+							// min/max used for creating slider
+							$.each(response.data.poiList, function(k, v) {
+								if(v.builtYearStart != 0){
+									// if(v.builtYearStart < min) {
+									// 	min = v.builtYearStart;
+		              //   	min = min < -4000 ? -4000 : min;
+									// }
+									// if(v.builtYearStart > max) {
+									// 	max = v.builtYearStart;
+									// }
+								cities.push(v);
+								}
+							});
+						} else {
+							$('#loader').toggle();
+							console.log(cities);
+							loadCountryCodes();
+						}
+					}
+					},
+					error: function(jqXHR, textStatus, errorThrown){
+						//alert("No response from the server");
+						return;
+					}
+					});
+				}
+				catch(err)
+				{
+					console.log("Error goapi: " + err.message + "\n\n");
+				}
+
+			}
+			var series = [];
+			var countryCodes;
+			var sitesAdded = 0;
+			function createMapData(){
+				console.log(countryCodes);
+				for (var i = 0; i < cities.length; i++){
+					// convert sites country to its 3 char country code
+					var alpha3;
+					for (country in countryCodes){
+						if (cities[i].country == countryCodes[country]["name"]){
+							alpha3 = countryCodes[country]["alpha-3"];
+							// console.log("Country" + ": " + cities[i].country);
+							// console.log("Country Code" + ": " + countryCodes[country]["name"]);
+							// console.log(countryCodes[country]["alpha-3"]);
+						}
+					}
+					// Add converted site to data structure
+					// Ex: ["USA", 10] -> USA has 10 historical sites
+					var added = false;
+					if (series.length != 0){
+						for (var x = 0; x < series.length; x++){
+							if (series[x][0] == alpha3){
+								series[x][1] += 1;
+								added = true;
+							}
+						}
+					}
+					if (!added){
+						series.push([alpha3, 1]);
+					}
+					sitesAdded += 1;
+				}
+				console.log("series");
+				console.log(series);
+				console.log("sitesAdded" + sitesAdded);
+				makeMap();
+			}
+
+			function loadCountryCodes(){
+				$.ajax({
+					url: './map_files/slim-3.json',
+					type: "GET",
+					cache: false,
+					success: function (response) {
+						countryCodes = response;
+						createMapData();
+					},
+					catch: function(err)
+					{
+					console.log("Error goapi: " + err.message + "\n\n");
+					return;
+					}
+				});
+			}
+
+			function makeMap(){
+				// Datamaps expect data in format:
+				// { "USA": { "fillColor": "#42a844", numberOfWhatever: 75},
+				//   "FRA": { "fillColor": "#8dc386", numberOfWhatever: 43 } }
+				var dataset = {};
+
+				// We need to colorize every country based on "numberOfWhatever"
+				// colors should be uniq for every value.
+				// For this purpose we create palette(using min/max series-value)
+				var onlyValues = series.map(function(obj){ return obj[1]; });
+				var minValue = Math.min.apply(null, onlyValues),
+								maxValue = Math.max.apply(null, onlyValues);
+
+				// create color palette function
+				// color can be whatever you wish
+				var paletteScale = d3.scale.linear()
+								.domain([minValue,maxValue])
+								.range(["#EFEFFF","#02386F"]); // blue color
+
+				// fill dataset in appropriate format
+				series.forEach(function(item){ //
+						// item example value ["USA", 70]
+						var iso = item[0],
+										value = item[1];
+						dataset[iso] = { numberOfThings: value, fillColor: paletteScale(value) };
+				});
+
+				// render map
+				var datamap = new Datamap({
+						element: document.getElementById('container1'),
+						done: function(datamap) {
+							datamap.svg.selectAll('.datamaps-subunit').on('click', function(geography) {
+								// onClick, get historic sites of that country.
+								// Display in a div below map.
+								displaySites(geography.properties.name);
+								console.log(geography.properties.name);
+							});
+						},
+						projection: 'mercator', // big world map
+						// countries don't listed in dataset will be painted with this color
+						fills: { defaultFill: '#F5F5F5' },
+						data: dataset,
+						geographyConfig: {
+								borderColor: '#DEDEDE',
+								highlightBorderWidth: 2,
+								// don't change color on mouse hover
+								highlightFillColor: function(geo) {
+										return geo['fillColor'] || '#F5F5F5';
+								},
+								// only change border
+								highlightBorderColor: '#B7B7B7',
+								// show desired information in tooltip
+								popupTemplate: function(geo, data) {
+										// don't show tooltip if country don't present in dataset
+										if (!data) { return ; }
+										// tooltip content
+										return ['<div class="hoverinfo">',
+												'<strong>', geo.properties.name, '</strong>',
+												'<br>Historic Sites: <strong>', data.numberOfThings, '</strong>',
+												'</div>'].join('');
+								}
+						}
+				});
+			}
+
+			var historicalSites = [];
+			function displaySites(countryName){
+				getHistoricalSites(countryName);
+				console.log(historicalSites);
+				var display = document.getElementById("display");
+				display.innerHTML = "";
+				for (var i = 0; i < historicalSites.length; i++){
+					var propertyName = historicalSites[i].name;
+					var type = historicalSites[i].type;
+					var country = historicalSites[i].country;
+					var region = historicalSites[i].state;
+					var id = historicalSites[i].otherId;
+					var latitude = historicalSites[i].latitude;
+					var longitude = historicalSites[i].longitude;
+					var startYear = historicalSites[i].builtYearStart;
+					var endYear = historicalSites[i].builtYearEnd;
+					var wikiUrl = historicalSites[i].wikiUrl;
+					var imgUrl = historicalSites[i].imageUrl;
+
+					// template where image exists
+					var template = "<h2>Heritage Site Info</h2><div class='col-md-6'>" +
+					"<div class='row'> <b>Name:</b> " + propertyName + "</div>" +
+					"<div class='row'> <b>Type:</b> " + type + "</div>" +
+					"<div class='row'> <b>Country:</b> " + country + "</div>" +
+					"<div class='row'> <b>Region:</b> " + region + "</div>" +
+					"<div class='row'> <b>ID:</b> " + id + "</div>" +
+					"<div class='row'> <b>Latitude:</b> " + latitude + "</div>" +
+					"<div class='row'> <b>Longitude:</b> " + longitude + "</div>" +
+					"<div class='row'> <b>Start Year:</b> " + startYear + "</div>" +
+					"<div class='row'> <b>End Year:</b>" + endYear + "</div>" +
+					// "<div class='row'> <b>Wiki URL:</b> <a href='" + wikiUrl + "'>Wiki URL</a></div>" +
+					"</div><div class='col-md-6'><a href='" + wikiUrl + "'><img src='" + imgUrl + "' height='relative' width='80%'></a></div></hr>";
+
+					// template without image
+					var template2 = "<h2>Heritage Site Info</h2><div class='col-md-12'>" +
+					"<div class='row'> <b>Name:</b> " + propertyName + "</div>" +
+					"<div class='row'> <b>Type:</b> " + type + "</div>" +
+					"<div class='row'> <b>Country:</b> " + country + "</div>" +
+					"<div class='row'> <b>Region:</b> " + region + "</div>" +
+					"<div class='row'> <b>ID:</b> " + id + "</div>" +
+					"<div class='row'> <b>Latitude:</b> " + latitude + "</div>" +
+					"<div class='row'> <b>Longitude:</b> " + longitude + "</div>" +
+					"<div class='row'> <b>Start Year:</b> " + startYear + "</div>" +
+					"<div class='row'> <b>End Year:</b>" + endYear + "</div>" +
+					"<div class='row'> <b>Wiki URL:</b> <a href='" + wikiUrl + "'>Wiki URL</a></div>" +
+					"</div></hr>";
+					// if (historicalSites[i]["imgUrl"] != undefined){
+					// 	template.append("<div class='col-md-5'>" + imgUrl + "</div>");
+					// }
+					if (imageExists(imgUrl)){
+						display.innerHTML += template;
+					} else {
+						display.innerHTML += template2;
+					}
+				}
+				historicalSites = [];
+			}
+
+			// need to fix this
+			function imageExists(image_url){
+				$.get(image_url)
+				    .done(function() {
+							console.log("true");
+							return true;
+				    }).fail(function() {
+							console.log("false");
+							return false;
+				    })
+			}
+
+			function getHistoricalSites(countryName){
+				for (var i = 0; i < cities.length; i++){
+					if (cities[i].country == countryName){
+						historicalSites.push(cities[i]);
+					}
+				}
+			}
+
+			function redraw() {
+			  width = document.getElementById('container').offsetWidth;
+			  height = width / 2;
+			  //height = document.body.scrollHeight - 150;
+
+			  document.getElementById('container1').innerHTML = "";
+			  makeMap();
+			};
+		</script>
+</body>
+</html>
